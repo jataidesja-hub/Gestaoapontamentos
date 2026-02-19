@@ -1,5 +1,9 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+if (!API_URL) {
+    console.error("ERRO: NEXT_PUBLIC_API_URL não está definida!");
+}
+
 export async function fetchEquipments() {
     const res = await fetch(`${API_URL}?action=getEquipments`);
     if (!res.ok) throw new Error('Failed to fetch equipments');
