@@ -60,8 +60,8 @@ export default function RootLayout({
                                 <p className="text-slate-500 mt-1">Bem-vindo ao centro de controle da sua frota.</p>
                             </div>
                             <div className="flex items-center gap-4">
-                                <div className="h-10 w-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold">
-                                    JS
+                                <div className="px-4 py-2 rounded-xl bg-primary-600 flex items-center justify-center text-white font-bold text-sm tracking-tight shadow-sm border border-primary-500/50">
+                                    J.A SOLUTION SOFTWARE
                                 </div>
                             </div>
                         </header>
