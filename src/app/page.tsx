@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Truck, AlertCircle, Clock, DollarSign, Calendar, Filter, ChevronRight, Ruler, Printer } from "lucide-react";
+import { Truck, AlertCircle, Clock, DollarSign, Calendar, Filter, ChevronRight, Ruler, FileSpreadsheet } from "lucide-react";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     AreaChart, Area
@@ -64,8 +64,6 @@ export default function Dashboard() {
             });
         });
 
-        const totalDaysInPeriod = differenceInDays(parseISO(endDate), parseISO(startDate)) + 1;
-
         // 1. Frota Ativa (Realtime)
         const totalEquip = equipments.length;
         const todayStr = formatDate(new Date());
@@ -95,7 +93,6 @@ export default function Dashboard() {
             const monthlyValue = Number(eq.valor_mensal) || 0;
             let valorPagar = (monthlyValue / 30) * activeDays;
 
-            // Extras se ultrapassar proporcional de 200h (estimado)
             if (totalHours > 200) {
                 const extraHours = totalHours - 200;
                 valorPagar += extraHours * (monthlyValue / 200);
@@ -122,65 +119,41 @@ export default function Dashboard() {
         });
     }
 
-    const handlePrint = (category: 'km' | 'h') => {
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
-
+    const handleExportExcel = (category: 'km' | 'h') => {
         const data = category === 'km' ? stats.categoryData.km : stats.categoryData.h;
-        const title = category === 'km' ? 'Relatório de Frota - KM' : 'Relatório de Equipamentos - Horímetro';
-        const unit = category === 'km' ? 'KM' : 'Horas';
+        const unit = category === 'km' ? 'KM' : 'HORAS';
 
-        let rows = data.map(eq => `
-      <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #eee;">${eq.nome}<br/><small style="color: #666;">${eq.placa}</small></td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${eq.activeDays}d</td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${eq.brokenDays}d</td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${(category === 'km' ? eq.totalKm : eq.totalHours).toFixed(1)}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold;">R$ ${eq.valorPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-      </tr>
-    `).join('');
+        // Header
+        let csvContent = "\uFEFF"; // BOM for Excel
+        csvContent += "Equipamento;Placa;Dias Rodados;Dias Parados;Produção (" + unit + ");Valor a Pagar (R$)\n";
 
+        // Rows
+        data.forEach(eq => {
+            const prodValue = category === 'km' ? eq.totalKm : eq.totalHours;
+            const row = [
+                eq.nome,
+                eq.placa,
+                eq.activeDays,
+                eq.brokenDays,
+                prodValue.toFixed(2).replace('.', ','),
+                eq.valorPagar.toFixed(2).replace('.', ',')
+            ].join(';');
+            csvContent += row + "\n";
+        });
+
+        // Total Footer
         const totalGeral = data.reduce((acc, eq) => acc + eq.valorPagar, 0);
+        csvContent += ";;;;TOTAL PERÍODO;" + totalGeral.toFixed(2).replace('.', ',') + "\n";
 
-        printWindow.document.write(`
-      <html>
-        <head>
-          <title>Impressão - ${title}</title>
-          <style>
-            body { font-family: sans-serif; padding: 40px; color: #333; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th { text-align: left; background: #f8fafc; padding: 12px; border-bottom: 2px solid #e2e8f0; font-size: 12px; text-transform: uppercase; }
-            .header { margin-bottom: 30px; border-bottom: 4px solid #0ea5e9; padding-bottom: 20px; }
-            .footer { margin-top: 30px; text-align: right; font-size: 18px; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>${title}</h1>
-            <p>Período: ${new Date(startDate).toLocaleDateString()} até ${new Date(endDate).toLocaleDateString()}</p>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Equipamento</th>
-                <th style="text-align: center;">Dias Rodados</th>
-                <th style="text-align: center;">Dias Parados</th>
-                <th style="text-align: center;">Produção (${unit})</th>
-                <th style="text-align: right;">Valor a Pagar</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows}
-            </tbody>
-          </table>
-          <div class="footer">
-            Total do Período: R$ ${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </div>
-          <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
-        </body>
-      </html>
-    `);
-        printWindow.document.close();
+        // Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Relatorio_${category.toUpperCase()}_${startDate}_${endDate}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     if (loading) {
@@ -239,10 +212,10 @@ export default function Dashboard() {
                             <h3 className="font-black text-slate-800 text-lg uppercase tracking-tight">Equipamentos KM</h3>
                         </div>
                         <button
-                            onClick={() => handlePrint('km')}
-                            className="flex items-center gap-2 bg-white text-primary-600 px-4 py-2 rounded-xl border border-primary-100 font-bold text-xs hover:bg-primary-50 transition-colors shadow-sm"
+                            onClick={() => handleExportExcel('km')}
+                            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-colors shadow-lg"
                         >
-                            <Printer size={14} /> IMPRIMIR
+                            <FileSpreadsheet size={14} /> EXPORTAR EXCEL
                         </button>
                     </div>
                     <div className="p-4">
@@ -284,10 +257,10 @@ export default function Dashboard() {
                             <h3 className="font-black text-slate-800 text-lg uppercase tracking-tight">Equipamentos H</h3>
                         </div>
                         <button
-                            onClick={() => handlePrint('h')}
-                            className="flex items-center gap-2 bg-white text-amber-600 px-4 py-2 rounded-xl border border-amber-100 font-bold text-xs hover:bg-amber-50 transition-colors shadow-sm"
+                            onClick={() => handleExportExcel('h')}
+                            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-colors shadow-lg"
                         >
-                            <Printer size={14} /> IMPRIMIR
+                            <FileSpreadsheet size={14} /> EXPORTAR EXCEL
                         </button>
                     </div>
                     <div className="p-4">
