@@ -218,9 +218,15 @@ export default function LançamentosPage() {
                                     <div className="grid grid-cols-2 gap-6">
                                         <div>
                                             <label className="text-[9px] font-bold text-primary-500 uppercase tracking-wider mb-1 block">Início (Anterior)</label>
-                                            <div className="bg-white px-4 py-3 rounded-xl border border-primary-100 font-mono font-bold text-primary-900 shadow-sm">
-                                                {formData.valorInicial}
-                                            </div>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                required
+                                                className="w-full bg-white border-2 border-transparent focus:border-primary-400 rounded-xl px-4 py-3 font-bold text-center text-primary-900 shadow-sm"
+                                                value={formData.valorInicial}
+                                                onChange={e => setFormData({ ...formData, valorInicial: e.target.value })}
+                                            />
+                                            <p className="text-[8px] text-primary-400 mt-1">* Editável se necessário</p>
                                         </div>
 
                                         {selectedEquip.categoria === 'H' ? (
