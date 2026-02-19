@@ -216,49 +216,51 @@ export default function LançamentosPage() {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-6">
-                                        <div>
-                                            <label className="text-[9px] font-bold text-primary-500 uppercase tracking-wider mb-1 block">Início (Anterior)</label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                required
-                                                className="w-full bg-white border-2 border-transparent focus:border-primary-400 rounded-xl px-4 py-3 font-bold text-center text-primary-900 shadow-sm"
-                                                value={formData.valorInicial}
-                                                onChange={e => setFormData({ ...formData, valorInicial: e.target.value })}
-                                            />
-                                            <p className="text-[8px] text-primary-400 mt-1">* Editável se necessário</p>
-                                        </div>
+                                        {selectedEquip.categoria === 'KM' && (
+                                            <div>
+                                                <label className="text-[9px] font-bold text-primary-500 uppercase tracking-wider mb-1 block">Início (KM)</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    required
+                                                    className="w-full bg-white border-2 border-transparent focus:border-primary-400 rounded-xl px-4 py-3 font-bold text-center text-primary-900 shadow-sm"
+                                                    value={formData.valorInicial}
+                                                    onChange={e => setFormData({ ...formData, valorInicial: e.target.value })}
+                                                />
+                                            </div>
+                                        )}
 
                                         {selectedEquip.categoria === 'H' ? (
-                                            <div className="col-span-1 space-y-4">
+                                            <div className="col-span-2 space-y-4">
                                                 <label className="text-[9px] font-bold text-primary-500 uppercase tracking-wider mb-1 block">Tempo trabalhado hoje</label>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="relative">
+                                                <div className="flex gap-4">
+                                                    <div className="flex-1 relative">
                                                         <input
                                                             type="number"
-                                                            placeholder="H"
-                                                            className="w-full bg-white border-2 border-transparent focus:border-primary-400 rounded-xl px-4 py-3 font-bold text-center"
+                                                            placeholder="00"
+                                                            className="w-full bg-white border-2 border-transparent focus:border-primary-400 rounded-xl px-4 py-3 font-bold text-center text-xl"
                                                             value={duration.hours}
                                                             onChange={e => setDuration({ ...duration, hours: e.target.value })}
                                                         />
                                                         <span className="absolute -top-1 right-2 text-[8px] text-slate-400">HORAS</span>
                                                     </div>
-                                                    <div className="relative">
+                                                    <div className="flex-1 relative">
                                                         <input
                                                             type="number"
-                                                            placeholder="M"
+                                                            placeholder="00"
                                                             max="59"
-                                                            className="w-full bg-white border-2 border-transparent focus:border-primary-400 rounded-xl px-4 py-3 font-bold text-center"
+                                                            className="w-full bg-white border-2 border-transparent focus:border-primary-400 rounded-xl px-4 py-3 font-bold text-center text-xl"
                                                             value={duration.minutes}
                                                             onChange={e => setDuration({ ...duration, minutes: e.target.value })}
                                                         />
-                                                        <span className="absolute -top-1 right-2 text-[8px] text-slate-400">MIN</span>
+                                                        <span className="absolute -top-1 right-2 text-[8px] text-slate-400">MINUTOS</span>
                                                     </div>
                                                 </div>
+                                                <p className="text-[8px] text-slate-400 text-center uppercase font-black">Será somado automaticamente ao horímetro anterior ({formData.valorInicial})</p>
                                             </div>
                                         ) : (
                                             <div>
-                                                <label className="text-[9px] font-bold text-primary-500 uppercase tracking-wider mb-1 block">Valor Final (Vejam medidor)</label>
+                                                <label className="text-[9px] font-bold text-primary-500 uppercase tracking-wider mb-1 block">Fim (KM)</label>
                                                 <input
                                                     type="number"
                                                     required
@@ -269,13 +271,6 @@ export default function LançamentosPage() {
                                             </div>
                                         )}
                                     </div>
-
-                                    {selectedEquip.categoria === 'H' && (
-                                        <div className="mt-4 pt-4 border-t border-primary-100 flex justify-between items-center text-[10px]">
-                                            <span className="text-primary-400 font-medium">TOTAL CALCULADO (METRO)</span>
-                                            <span className="font-black text-primary-900 text-sm font-mono">{formData.valorFinal}</span>
-                                        </div>
-                                    )}
                                 </div>
                             )}
 
