@@ -119,38 +119,54 @@ export default function Dashboard() {
         });
     }
 
-    const handleExportExcel = (category: 'km' | 'h') => {
+    const handleExportXLS = (category: 'km' | 'h') => {
         const data = category === 'km' ? stats.categoryData.km : stats.categoryData.h;
         const unit = category === 'km' ? 'KM' : 'HORAS';
+        const title = category === 'km' ? 'Relatório de Frota - KM' : 'Relatório de Equipamentos - Horímetro';
 
-        // Header
-        let csvContent = "\uFEFF"; // BOM for Excel
-        csvContent += "Equipamento;Placa;Dias Rodados;Dias Parados;Produção (" + unit + ");Valor a Pagar (R$)\n";
+        // HTML Table to Excel XML trick
+        let html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="UTF-8"></head>
+      <body>
+        <table>
+          <tr><th colspan="6">${title}</th></tr>
+          <tr><th colspan="6">Período: ${startDate} até ${endDate}</th></tr>
+          <tr></tr>
+          <tr style="background-color: #f8fafc;">
+            <th>Equipamento</th>
+            <th>Placa</th>
+            <th>Dias Rodados</th>
+            <th>Dias Parados</th>
+            <th>Produção (${unit})</th>
+            <th>Valor a Pagar (R$)</th>
+          </tr>
+          ${data.map(eq => `
+            <tr>
+              <td>${eq.nome}</td>
+              <td>${eq.placa}</td>
+              <td>${eq.activeDays}</td>
+              <td>${eq.brokenDays}</td>
+              <td>${(category === 'km' ? eq.totalKm : eq.totalHours).toFixed(2).replace('.', ',')}</td>
+              <td>${eq.valorPagar.toFixed(2).replace('.', ',')}</td>
+            </tr>
+          `).join('')}
+          <tr></tr>
+          <tr>
+            <td colspan="4"></td>
+            <td style="font-weight: bold;">TOTAL PERÍODO:</td>
+            <td style="font-weight: bold;">${data.reduce((acc, eq) => acc + eq.valorPagar, 0).toFixed(2).replace('.', ',')}</td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
 
-        // Rows
-        data.forEach(eq => {
-            const prodValue = category === 'km' ? eq.totalKm : eq.totalHours;
-            const row = [
-                eq.nome,
-                eq.placa,
-                eq.activeDays,
-                eq.brokenDays,
-                prodValue.toFixed(2).replace('.', ','),
-                eq.valorPagar.toFixed(2).replace('.', ',')
-            ].join(';');
-            csvContent += row + "\n";
-        });
-
-        // Total Footer
-        const totalGeral = data.reduce((acc, eq) => acc + eq.valorPagar, 0);
-        csvContent += ";;;;TOTAL PERÍODO;" + totalGeral.toFixed(2).replace('.', ',') + "\n";
-
-        // Download
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `Relatorio_${category.toUpperCase()}_${startDate}_${endDate}.csv`);
+        link.setAttribute("download", `Relatorio_${category.toUpperCase()}_${startDate}_${endDate}.xls`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -202,7 +218,7 @@ export default function Dashboard() {
                 <StatCard title="Receita Est." value={stats.faturamentoPrevisto} icon={<DollarSign className="text-emerald-500" />} label="Período selecionado" />
             </div>
 
-            {/* Category Panels (Requested) */}
+            {/* Category Panels */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Quilometragem Panel */}
                 <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -212,10 +228,10 @@ export default function Dashboard() {
                             <h3 className="font-black text-slate-800 text-lg uppercase tracking-tight">Equipamentos KM</h3>
                         </div>
                         <button
-                            onClick={() => handleExportExcel('km')}
+                            onClick={() => handleExportXLS('km')}
                             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-colors shadow-lg"
                         >
-                            <FileSpreadsheet size={14} /> EXPORTAR EXCEL
+                            <FileSpreadsheet size={14} /> BAIXAR EM XLS
                         </button>
                     </div>
                     <div className="p-4">
@@ -257,10 +273,10 @@ export default function Dashboard() {
                             <h3 className="font-black text-slate-800 text-lg uppercase tracking-tight">Equipamentos H</h3>
                         </div>
                         <button
-                            onClick={() => handleExportExcel('h')}
+                            onClick={() => handleExportXLS('h')}
                             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-[10px] hover:bg-emerald-700 transition-colors shadow-lg"
                         >
-                            <FileSpreadsheet size={14} /> EXPORTAR EXCEL
+                            <FileSpreadsheet size={14} /> BAIXAR EM XLS
                         </button>
                     </div>
                     <div className="p-4">
