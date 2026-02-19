@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Truck, AlertCircle, Clock, DollarSign, Calendar, Filter, ChevronRight, Ruler } from "lucide-react";
+import { Truck, AlertCircle, Clock, DollarSign, Calendar, Filter, ChevronRight, Ruler, Printer } from "lucide-react";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     AreaChart, Area
 } from 'recharts';
 import { fetchEquipments, fetchEntries } from "@/lib/api";
-import { isWithinInterval, parseISO, startOfMonth, endOfMonth } from "date-fns";
+import { isWithinInterval, parseISO, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
 
 export default function Dashboard() {
     const [loading, setLoading] = useState(true);
@@ -64,56 +64,49 @@ export default function Dashboard() {
             });
         });
 
-        // 1. Frota Ativa (Status atual, ignorando filtro de data para este card específico pois é 'realtime')
+        const totalDaysInPeriod = differenceInDays(parseISO(endDate), parseISO(startDate)) + 1;
+
+        // 1. Frota Ativa (Realtime)
         const totalEquip = equipments.length;
         const todayStr = formatDate(new Date());
         const brokenToday = allEntries.filter((e: any) =>
             e.data === todayStr && e.status === 'Quebrado'
         ).length;
 
-        // 2. Report por Categoria (Com base no filtro)
+        // 2. Report por Categoria
         const kmReport = equipments.filter(eq => eq.categoria === 'KM').map(eq => {
             const eqEntries = filteredEntries.filter(ent => ent.id_equipamento === eq.id);
             const totalKm = eqEntries.reduce((acc, ent) => acc + (Number(ent.valor_final) - Number(ent.valor_inicial)), 0);
             const activeDays = eqEntries.filter(ent => ent.status === 'Ativo').length;
-            return { ...eq, totalKm, activeDays };
+            const brokenDays = eqEntries.filter(ent => ent.status === 'Quebrado').length;
+
+            const monthlyValue = Number(eq.valor_mensal) || 0;
+            const valorPagar = (monthlyValue / 30) * activeDays;
+
+            return { ...eq, totalKm, activeDays, brokenDays, valorPagar };
         });
 
         const hReport = equipments.filter(eq => eq.categoria === 'H').map(eq => {
             const eqEntries = filteredEntries.filter(ent => ent.id_equipamento === eq.id);
             const totalHours = eqEntries.reduce((acc, ent) => acc + (Number(ent.valor_final) - Number(ent.valor_inicial)), 0);
             const activeDays = eqEntries.filter(ent => ent.status === 'Ativo').length;
-            return { ...eq, totalHours, activeDays };
-        });
+            const brokenDays = eqEntries.filter(ent => ent.status === 'Quebrado').length;
 
-        // 3. Totais para Cards
-        const totalSelectedHours = hReport.reduce((acc, eq) => acc + eq.totalHours, 0);
-
-        let totalFaturamento = 0;
-        equipments.forEach((eq: any) => {
-            const eqEntries = filteredEntries.filter((ent: any) => ent.id_equipamento === eq.id);
             const monthlyValue = Number(eq.valor_mensal) || 0;
+            let valorPagar = (monthlyValue / 30) * activeDays;
 
-            if (eq.categoria === 'KM') {
-                const brokenDays = eqEntries.filter((ent: any) => ent.status === 'Quebrado').length;
-                // Cálculo simplificado: Assume que o período tem X dias
-                const daysInPeriod = eqEntries.length || 1;
-                const availabilityRate = (daysInPeriod - brokenDays) / daysInPeriod;
-                totalFaturamento += (monthlyValue / 30) * (daysInPeriod - brokenDays); // Faturamento diário proporcional
-            } else {
-                const totalEqHours = eqEntries.reduce((sum: number, ent: any) =>
-                    sum + (Number(ent.valor_final) - Number(ent.valor_inicial)), 0
-                );
-                // Simplificado: Se o período for próximo de um mês, aplica o valor cheio + extras
-                totalFaturamento += (monthlyValue / 30) * (eqEntries.length || 0);
-                if (totalEqHours > 200) {
-                    const extraHours = totalEqHours - 200;
-                    totalFaturamento += extraHours * (monthlyValue / 200);
-                }
+            // Extras se ultrapassar proporcional de 200h (estimado)
+            if (totalHours > 200) {
+                const extraHours = totalHours - 200;
+                valorPagar += extraHours * (monthlyValue / 200);
             }
+
+            return { ...eq, totalHours, activeDays, brokenDays, valorPagar };
         });
 
-        // Gráfico nos últimos 7 dias do filtro
+        const totalSelectedHours = hReport.reduce((acc, eq) => acc + eq.totalHours, 0);
+        const totalFaturamento = [...kmReport, ...hReport].reduce((acc, eq) => acc + eq.valorPagar, 0);
+
         const chartData = filteredEntries.slice(-10).map((e: any) => ({
             name: new Date(e.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
             prod: Number(e.valor_final) - Number(e.valor_inicial)
@@ -128,6 +121,67 @@ export default function Dashboard() {
             chartData
         });
     }
+
+    const handlePrint = (category: 'km' | 'h') => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const data = category === 'km' ? stats.categoryData.km : stats.categoryData.h;
+        const title = category === 'km' ? 'Relatório de Frota - KM' : 'Relatório de Equipamentos - Horímetro';
+        const unit = category === 'km' ? 'KM' : 'Horas';
+
+        let rows = data.map(eq => `
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">${eq.nome}<br/><small style="color: #666;">${eq.placa}</small></td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${eq.activeDays}d</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${eq.brokenDays}d</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${(category === 'km' ? eq.totalKm : eq.totalHours).toFixed(1)}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right; font-weight: bold;">R$ ${eq.valorPagar.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      </tr>
+    `).join('');
+
+        const totalGeral = data.reduce((acc, eq) => acc + eq.valorPagar, 0);
+
+        printWindow.document.write(`
+      <html>
+        <head>
+          <title>Impressão - ${title}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { text-align: left; background: #f8fafc; padding: 12px; border-bottom: 2px solid #e2e8f0; font-size: 12px; text-transform: uppercase; }
+            .header { margin-bottom: 30px; border-bottom: 4px solid #0ea5e9; padding-bottom: 20px; }
+            .footer { margin-top: 30px; text-align: right; font-size: 18px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${title}</h1>
+            <p>Período: ${new Date(startDate).toLocaleDateString()} até ${new Date(endDate).toLocaleDateString()}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Equipamento</th>
+                <th style="text-align: center;">Dias Rodados</th>
+                <th style="text-align: center;">Dias Parados</th>
+                <th style="text-align: center;">Produção (${unit})</th>
+                <th style="text-align: right;">Valor a Pagar</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+          <div class="footer">
+            Total do Período: R$ ${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </div>
+          <script>setTimeout(() => { window.print(); window.close(); }, 500);</script>
+        </body>
+      </html>
+    `);
+        printWindow.document.close();
+    };
 
     if (loading) {
         return (
@@ -184,7 +238,12 @@ export default function Dashboard() {
                             <div className="p-3 bg-primary-100 text-primary-600 rounded-2xl"><Ruler size={20} /></div>
                             <h3 className="font-black text-slate-800 text-lg uppercase tracking-tight">Equipamentos KM</h3>
                         </div>
-                        <span className="text-[10px] font-black bg-white px-3 py-1 rounded-full text-slate-400 border border-slate-100">FROTAS</span>
+                        <button
+                            onClick={() => handlePrint('km')}
+                            className="flex items-center gap-2 bg-white text-primary-600 px-4 py-2 rounded-xl border border-primary-100 font-bold text-xs hover:bg-primary-50 transition-colors shadow-sm"
+                        >
+                            <Printer size={14} /> IMPRIMIR
+                        </button>
                     </div>
                     <div className="p-4">
                         <div className="space-y-4">
@@ -197,14 +256,18 @@ export default function Dashboard() {
                                             <p className="text-[10px] text-slate-400 font-bold uppercase">{eq.placa}</p>
                                         </div>
                                     </div>
-                                    <div className="flex gap-8 text-right">
+                                    <div className="flex gap-6 text-right">
                                         <div>
-                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Dias</p>
-                                            <p className="text-lg font-black text-emerald-600">{eq.activeDays}d</p>
+                                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Ativo</p>
+                                            <p className="text-md font-black text-emerald-600">{eq.activeDays}d</p>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Total</p>
-                                            <p className="text-lg font-black text-primary-600">{eq.totalKm.toFixed(0)} <span className="text-[10px]">KM</span></p>
+                                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Parado</p>
+                                            <p className="text-md font-black text-red-400">{eq.brokenDays}d</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Total</p>
+                                            <p className="text-md font-black text-primary-600">{eq.totalKm.toFixed(0)} <span className="text-[9px]">KM</span></p>
                                         </div>
                                     </div>
                                 </div>
@@ -220,7 +283,12 @@ export default function Dashboard() {
                             <div className="p-3 bg-amber-100 text-amber-600 rounded-2xl"><Clock size={20} /></div>
                             <h3 className="font-black text-slate-800 text-lg uppercase tracking-tight">Equipamentos H</h3>
                         </div>
-                        <span className="text-[10px] font-black bg-white px-3 py-1 rounded-full text-slate-400 border border-slate-100">PESADOS</span>
+                        <button
+                            onClick={() => handlePrint('h')}
+                            className="flex items-center gap-2 bg-white text-amber-600 px-4 py-2 rounded-xl border border-amber-100 font-bold text-xs hover:bg-amber-50 transition-colors shadow-sm"
+                        >
+                            <Printer size={14} /> IMPRIMIR
+                        </button>
                     </div>
                     <div className="p-4">
                         <div className="space-y-4">
@@ -233,14 +301,18 @@ export default function Dashboard() {
                                             <p className="text-[10px] text-slate-400 font-bold uppercase">{eq.placa}</p>
                                         </div>
                                     </div>
-                                    <div className="flex gap-8 text-right">
+                                    <div className="flex gap-6 text-right">
                                         <div>
-                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Dias</p>
-                                            <p className="text-lg font-black text-emerald-600">{eq.activeDays}d</p>
+                                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Ativo</p>
+                                            <p className="text-md font-black text-emerald-600">{eq.activeDays}d</p>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Total</p>
-                                            <p className="text-lg font-black text-amber-600">{eq.totalHours.toFixed(1)} <span className="text-[10px]">H</span></p>
+                                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Parado</p>
+                                            <p className="text-md font-black text-red-400">{eq.brokenDays}d</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Total</p>
+                                            <p className="text-md font-black text-amber-600">{eq.totalHours.toFixed(1)} <span className="text-[9px]">H</span></p>
                                         </div>
                                     </div>
                                 </div>
